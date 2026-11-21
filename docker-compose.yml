@@ -109,7 +109,7 @@ services:
       AWS_CA_BUNDLE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/ca.pem"
       AWS_SHARED_CREDENTIALS_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/emulator_credentials"
       AWS_CONFIG_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/config"
-      AWS_SQS_URL: "https://127.0.0.1:${AWS_EMULATOR_PORT:-9297}/000000000000/${AWS_SQS_QUEUE_NAME:-solidary-donations}"
+      AWS_SQS_URL: "https://sqs.${AWS_REGION:-us-east-1}.amazonaws.com/000000000000/${AWS_SQS_QUEUE_NAME:-solidary-donations}"
     volumes:
       - aws_emulator_data:/aws-emulator:ro
 
