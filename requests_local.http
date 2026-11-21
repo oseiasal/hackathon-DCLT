@@ -1,0 +1,65 @@
+@ngoUrl = http://localhost:8081
+@donationUrl = http://localhost:8082
+@volunteerUrl = http://localhost:8083
+@ngoId = 1
+
+###############################################################################
+# 1. NGO SERVICE (Python / Flask + PostgreSQL)
+###############################################################################
+
+### Health Check - NGO Service
+GET {{ngoUrl}}/health
+
+### Listar ONGs (ja vem com 2 ONGs do seed)
+GET {{ngoUrl}}/ngos
+
+### Cadastrar nova ONG
+POST {{ngoUrl}}/ngos
+Content-Type: application/json
+
+{
+  "name": "Instituto Esperanca",
+  "email": "contato@institutoesptanca.org",
+  "cause": "Combate a Fome",
+  "city": "Sao Paulo"
+}
+
+###############################################################################
+# 2. DONATION SERVICE (Go + PostgreSQL + AWS SQS)
+###############################################################################
+
+### Health Check - Donation Service
+GET {{donationUrl}}/health
+
+### Registrar nova doacao (persiste no Postgres e dispara evento SQS)
+POST {{donationUrl}}/donations
+Content-Type: application/json
+
+{
+  "ngo_id": {{ngoId}},
+  "amount": 150.50,
+  "donor_name": "Joao Silva"
+}
+
+### Listar doacoes
+GET {{donationUrl}}/donations
+
+###############################################################################
+# 3. VOLUNTEER SERVICE (Python / Flask + AWS DynamoDB)
+###############################################################################
+
+### Health Check - Volunteer Service
+GET {{volunteerUrl}}/health
+
+### Cadastrar voluntario
+POST {{volunteerUrl}}/volunteers
+Content-Type: application/json
+
+{
+  "name": "Maria Oliveira",
+  "email": "maria.oliveira@exemplo.org",
+  "ngo_id": {{ngoId}}
+}
+
+### Listar voluntarios por ONG
+GET {{volunteerUrl}}/volunteers/{{ngoId}}
