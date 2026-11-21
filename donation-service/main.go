@@ -3,11 +3,9 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -46,7 +44,10 @@ func main() {
 	}
 
 	db, err := sql.Open("pgx", dbURL)
-	if err != nil || db.Ping() != nil {
+	if err != nil {
+		log.Fatalf("Erro ao abrir conexão com o banco de dados: %v", err)
+	}
+	if err = db.Ping(); err != nil {
 		log.Fatalf("Erro ao conectar ao banco de dados: %v", err)
 	}
 	log.Println("Conectado ao PostgreSQL (donation-service).")
@@ -55,7 +56,17 @@ func main() {
 	queueURL := os.Getenv("AWS_SQS_URL")
 	region := os.Getenv("AWS_REGION")
 	if queueURL != "" && region != "" {
-		sess, _ := session.NewSession(&aws.Config{Region: aws.String(region)})
+		awsCfg := aws.Config{Region: aws.String(region)}
+		if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
+			awsCfg.Endpoint = aws.String(endpoint)
+		}
+		sess, err := session.NewSessionWithOptions(session.Options{
+			Config:            awsCfg,
+			SharedConfigState: session.SharedConfigEnable,
+		})
+		if err != nil {
+			log.Fatalf("Erro ao inicializar sessão AWS: %v", err)
+		}
 		sqsSvc = sqs.New(sess)
 		log.Println("Integração com AWS SQS ativada.")
 	}
