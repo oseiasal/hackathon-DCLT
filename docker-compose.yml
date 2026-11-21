@@ -1,0 +1,142 @@
+name: solidarytech
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: solidarytech-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-solidary}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-solidary_pass}
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/local/postgres-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      - ./ngo-service/db/init.sql:/sql/ngo-init.sql:ro
+      - ./donation-service/db/init.sql:/sql/donation-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-solidary} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - solidarytech
+
+  # AWS Emulator oficial (https://docs.aws.amazon.com/emulator/)
+  # O certificado TLS gerado cobre apenas localhost/127.0.0.1, portanto os serviços
+  # que consomem AWS (donation-service, volunteer-service e aws-emulator-init)
+  # compartilham o namespace de rede deste container via network_mode.
+  aws-emulator:
+    build:
+      context: ./infra/local/aws-emulator
+      dockerfile: Dockerfile
+    container_name: solidarytech-aws-emulator
+    command: ["--port", "${AWS_EMULATOR_PORT:-9297}"]
+    ports:
+      - "127.0.0.1:${AWS_EMULATOR_PORT:-9297}:${AWS_EMULATOR_PORT:-9297}"
+      - "${DONATION_SERVICE_PORT:-8082}:8082"
+      - "${VOLUNTEER_SERVICE_PORT:-8083}:8083"
+    volumes:
+      - aws_emulator_data:/home/emulator/.aws/emulator
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf --cacert /home/emulator/.aws/emulator/${AWS_EMULATOR_PORT:-9297}/ca.pem https://127.0.0.1:${AWS_EMULATOR_PORT:-9297}/__admin/health"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    networks:
+      solidarytech:
+        aliases:
+          - aws-emulator
+          - donation-service
+          - volunteer-service
+
+  aws-emulator-init:
+    image: amazon/aws-cli:latest
+    container_name: solidarytech-aws-emulator-init
+    network_mode: "service:aws-emulator"
+    user: "1000:1000"
+    depends_on:
+      aws-emulator:
+        condition: service_healthy
+    environment:
+      AWS_EMULATOR_PORT: ${AWS_EMULATOR_PORT:-9297}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_DYNAMODB_TABLE: ${AWS_DYNAMODB_TABLE:-SolidaryTechVolunteers}
+      AWS_SQS_QUEUE_NAME: ${AWS_SQS_QUEUE_NAME:-solidary-donations}
+    volumes:
+      - aws_emulator_data:/aws-emulator:ro
+      - ./infra/local/init-aws.sh:/init-aws.sh:ro
+    entrypoint: ["/bin/sh", "/init-aws.sh"]
+    restart: "no"
+
+  ngo-service:
+    build:
+      context: ./ngo-service
+      dockerfile: Dockerfile
+    container_name: solidarytech-ngo-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${NGO_SERVICE_PORT:-8081}:8081"
+    environment:
+      PORT: "8081"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-solidary}:${POSTGRES_PASSWORD:-solidary_pass}@postgres:5432/ngo_db"
+    networks:
+      - solidarytech
+
+  donation-service:
+    build:
+      context: ./donation-service
+      dockerfile: Dockerfile
+    container_name: solidarytech-donation-service
+    network_mode: "service:aws-emulator"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      aws-emulator-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: "8082"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-solidary}:${POSTGRES_PASSWORD:-solidary_pass}@postgres:5432/donation_db"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ENDPOINT_URL: "https://127.0.0.1:${AWS_EMULATOR_PORT:-9297}"
+      AWS_CA_BUNDLE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/ca.pem"
+      AWS_SHARED_CREDENTIALS_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/emulator_credentials"
+      AWS_CONFIG_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/config"
+      AWS_SQS_URL: "https://127.0.0.1:${AWS_EMULATOR_PORT:-9297}/000000000000/${AWS_SQS_QUEUE_NAME:-solidary-donations}"
+    volumes:
+      - aws_emulator_data:/aws-emulator:ro
+
+  volunteer-service:
+    build:
+      context: ./volunteer-service
+      dockerfile: Dockerfile
+    container_name: solidarytech-volunteer-service
+    network_mode: "service:aws-emulator"
+    depends_on:
+      aws-emulator-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: "8083"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_DYNAMODB_TABLE: ${AWS_DYNAMODB_TABLE:-SolidaryTechVolunteers}
+      AWS_ENDPOINT_URL: "https://127.0.0.1:${AWS_EMULATOR_PORT:-9297}"
+      AWS_CA_BUNDLE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/ca.pem"
+      AWS_SHARED_CREDENTIALS_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/emulator_credentials"
+      AWS_CONFIG_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/config"
+    volumes:
+      - aws_emulator_data:/aws-emulator:ro
+
+volumes:
+  postgres_data:
+  aws_emulator_data:
+
+networks:
+  solidarytech:
+    driver: bridge

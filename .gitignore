@@ -1,0 +1,31 @@
+# Environment variables
+.env
+*.env.local
+ngo-service/.env
+donation-service/.env
+volunteer-service/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+
+# Go
+*.exe
+*.out
+donation-service/donation-service
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Terraform (futuro)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
