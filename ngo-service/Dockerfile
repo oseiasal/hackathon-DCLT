@@ -20,4 +20,4 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 USER 1000:1000
 EXPOSE 8081
 
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} app:app"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --graceful-timeout 30 --timeout 30 --error-logfile - app:app"]

@@ -86,7 +86,9 @@ services:
       - "${NGO_SERVICE_PORT:-8081}:8081"
     environment:
       PORT: "8081"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DATABASE_URL: "postgres://${POSTGRES_USER:-solidary}:${POSTGRES_PASSWORD:-solidary_pass}@postgres:5432/ngo_db"
+    stop_grace_period: 30s
     networks:
       - solidarytech
 
@@ -103,6 +105,7 @@ services:
         condition: service_completed_successfully
     environment:
       PORT: "8082"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DATABASE_URL: "postgres://${POSTGRES_USER:-solidary}:${POSTGRES_PASSWORD:-solidary_pass}@postgres:5432/donation_db"
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ENDPOINT_URL: "https://127.0.0.1:${AWS_EMULATOR_PORT:-9297}"
@@ -110,6 +113,7 @@ services:
       AWS_SHARED_CREDENTIALS_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/emulator_credentials"
       AWS_CONFIG_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/config"
       AWS_SQS_URL: "https://sqs.${AWS_REGION:-us-east-1}.amazonaws.com/000000000000/${AWS_SQS_QUEUE_NAME:-solidary-donations}"
+    stop_grace_period: 25s
     volumes:
       - aws_emulator_data:/aws-emulator:ro
 
@@ -124,12 +128,14 @@ services:
         condition: service_completed_successfully
     environment:
       PORT: "8083"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_DYNAMODB_TABLE: ${AWS_DYNAMODB_TABLE:-SolidaryTechVolunteers}
       AWS_ENDPOINT_URL: "https://127.0.0.1:${AWS_EMULATOR_PORT:-9297}"
       AWS_CA_BUNDLE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/ca.pem"
       AWS_SHARED_CREDENTIALS_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/emulator_credentials"
       AWS_CONFIG_FILE: "/aws-emulator/${AWS_EMULATOR_PORT:-9297}/config"
+    stop_grace_period: 30s
     volumes:
       - aws_emulator_data:/aws-emulator:ro
 

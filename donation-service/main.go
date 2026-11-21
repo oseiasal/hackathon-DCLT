@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -14,6 +20,8 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/joho/godotenv"
 )
+
+const serviceName = "donation-service"
 
 type Donation struct {
 	ID        int       `json:"id"`
@@ -28,10 +36,42 @@ type App struct {
 	DB          *sql.DB
 	SqsSvc      *sqs.SQS
 	SqsQueueURL string
+	Logger      *slog.Logger
+	wg          sync.WaitGroup
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (sr *statusRecorder) WriteHeader(code int) {
+	sr.statusCode = code
+	sr.ResponseWriter.WriteHeader(code)
+}
+
+func setupLogger() *slog.Logger {
+	var level slog.Level
+	switch strings.ToUpper(os.Getenv("LOG_LEVEL")) {
+	case "DEBUG":
+		level = slog.LevelDebug
+	case "WARN", "WARNING":
+		level = slog.LevelWarn
+	case "ERROR":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	return slog.New(handler).With("service", serviceName)
 }
 
 func main() {
 	_ = godotenv.Load()
+
+	logger := setupLogger()
+	slog.SetDefault(logger)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -40,17 +80,25 @@ func main() {
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		log.Fatal("DATABASE_URL é obrigatória")
+		logger.Error("DATABASE_URL é obrigatória")
+		os.Exit(1)
 	}
 
 	db, err := sql.Open("pgx", dbURL)
 	if err != nil {
-		log.Fatalf("Erro ao abrir conexão com o banco de dados: %v", err)
+		logger.Error("Erro ao abrir conexão com o banco de dados", "error", err)
+		os.Exit(1)
 	}
-	if err = db.Ping(); err != nil {
-		log.Fatalf("Erro ao conectar ao banco de dados: %v", err)
+
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	err = db.PingContext(pingCtx)
+	pingCancel()
+	if err != nil {
+		logger.Error("Erro ao conectar ao banco de dados", "error", err)
+		_ = db.Close()
+		os.Exit(1)
 	}
-	log.Println("Conectado ao PostgreSQL (donation-service).")
+	logger.Info("Conectado ao PostgreSQL")
 
 	var sqsSvc *sqs.SQS
 	queueURL := os.Getenv("AWS_SQS_URL")
@@ -65,26 +113,103 @@ func main() {
 			SharedConfigState: session.SharedConfigEnable,
 		})
 		if err != nil {
-			log.Fatalf("Erro ao inicializar sessão AWS: %v", err)
+			logger.Error("Erro ao inicializar sessão AWS", "error", err)
+			_ = db.Close()
+			os.Exit(1)
 		}
 		sqsSvc = sqs.New(sess)
-		log.Println("Integração com AWS SQS ativada.")
+		logger.Info("Integração com AWS SQS ativada", "region", region)
 	}
 
-	app := &App{DB: db, SqsSvc: sqsSvc, SqsQueueURL: queueURL}
+	app := &App{
+		DB:          db,
+		SqsSvc:      sqsSvc,
+		SqsQueueURL: queueURL,
+		Logger:      logger,
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", app.HealthHandler)
+	mux.HandleFunc("/health/live", app.HealthHandler)
+	mux.HandleFunc("/health/ready", app.ReadyHandler)
 	mux.HandleFunc("/donations", app.DonationHandler)
 
-	log.Printf("donation-service rodando na porta %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           app.loggingMiddleware(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		logger.Info("Servidor HTTP iniciado", "port", port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("Erro fatal no servidor HTTP", "error", err)
+			stop()
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Info("Sinal de encerramento recebido; iniciando graceful shutdown")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Erro durante shutdown do servidor HTTP", "error", err)
+	}
+
+	logger.Info("Aguardando eventos assíncronos em voo")
+	app.wg.Wait()
+
+	if err := db.Close(); err != nil {
+		logger.Error("Erro ao fechar conexão com PostgreSQL", "error", err)
+	}
+
+	logger.Info("Encerramento concluído com segurança")
+}
+
+func (a *App) loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(rec, r)
+
+		a.Logger.Info("http_request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rec.statusCode,
+			"duration_ms", float64(time.Since(start).Microseconds())/1000.0,
+		)
+	})
 }
 
 func (a *App) HealthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok","service":"donation-service"}`))
+}
+
+func (a *App) ReadyHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	if err := a.DB.PingContext(ctx); err != nil {
+		a.Logger.Warn("Readiness check falhou", "dependency", "postgres", "error", err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte(`{"status":"not_ready","service":"donation-service","checks":{"postgres":"error"}}`))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ready","service":"donation-service","checks":{"postgres":"ok"}}`))
 }
 
 func (a *App) DonationHandler(w http.ResponseWriter, r *http.Request) {
@@ -98,18 +223,20 @@ func (a *App) DonationHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		d.Status = "APPROVED" // Simulação de gateway de pagamento
-		err := a.DB.QueryRow(
+		err := a.DB.QueryRowContext(
+			r.Context(),
 			"INSERT INTO donations (ngo_id, amount, donor_name, status) VALUES ($1, $2, $3, $4) RETURNING id, created_at",
 			d.NgoID, d.Amount, d.DonorName, d.Status,
 		).Scan(&d.ID, &d.CreatedAt)
 
 		if err != nil {
-			log.Printf("Erro ao salvar doação: %v", err)
+			a.Logger.Error("Erro ao salvar doação", "error", err)
 			http.Error(w, `{"error":"Erro interno"}`, http.StatusInternalServerError)
 			return
 		}
 
 		if a.SqsSvc != nil {
+			a.wg.Add(1)
 			go a.sendNotificationEvent(d)
 		}
 
@@ -119,8 +246,9 @@ func (a *App) DonationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodGet {
-		rows, err := a.DB.Query("SELECT id, ngo_id, amount, donor_name, status, created_at FROM donations ORDER BY id DESC")
+		rows, err := a.DB.QueryContext(r.Context(), "SELECT id, ngo_id, amount, donor_name, status, created_at FROM donations ORDER BY id DESC")
 		if err != nil {
+			a.Logger.Error("Erro ao listar doações", "error", err)
 			http.Error(w, `{"error":"Erro interno"}`, http.StatusInternalServerError)
 			return
 		}
@@ -141,12 +269,20 @@ func (a *App) DonationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) sendNotificationEvent(d Donation) {
+	defer a.wg.Done()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	body, _ := json.Marshal(d)
-	_, err := a.SqsSvc.SendMessage(&sqs.SendMessageInput{
+	_, err := a.SqsSvc.SendMessageWithContext(ctx, &sqs.SendMessageInput{
 		MessageBody: aws.String(string(body)),
 		QueueUrl:    aws.String(a.SqsQueueURL),
 	})
 	if err != nil {
-		log.Printf("Falha ao despachar evento SQS: %v", err)
+		a.Logger.Error("Falha ao despachar evento SQS", "donation_id", d.ID, "error", err)
+		return
 	}
+
+	a.Logger.Info("Evento SQS despachado", "donation_id", d.ID)
 }

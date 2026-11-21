@@ -7,8 +7,11 @@
 # 1. NGO SERVICE (Python / Flask + PostgreSQL)
 ###############################################################################
 
-### Health Check - NGO Service
-GET {{ngoUrl}}/health
+### Liveness - NGO Service
+GET {{ngoUrl}}/health/live
+
+### Readiness (valida PostgreSQL) - NGO Service
+GET {{ngoUrl}}/health/ready
 
 ### Listar ONGs (ja vem com 2 ONGs do seed)
 GET {{ngoUrl}}/ngos
@@ -19,7 +22,7 @@ Content-Type: application/json
 
 {
   "name": "Instituto Esperanca",
-  "email": "contato@institutoesptanca.org",
+  "email": "contato@institutoesperanca.org",
   "cause": "Combate a Fome",
   "city": "Sao Paulo"
 }
@@ -28,8 +31,11 @@ Content-Type: application/json
 # 2. DONATION SERVICE (Go + PostgreSQL + AWS SQS)
 ###############################################################################
 
-### Health Check - Donation Service
-GET {{donationUrl}}/health
+### Liveness - Donation Service
+GET {{donationUrl}}/health/live
+
+### Readiness (valida PostgreSQL) - Donation Service
+GET {{donationUrl}}/health/ready
 
 ### Registrar nova doacao (persiste no Postgres e dispara evento SQS)
 POST {{donationUrl}}/donations
@@ -48,8 +54,11 @@ GET {{donationUrl}}/donations
 # 3. VOLUNTEER SERVICE (Python / Flask + AWS DynamoDB)
 ###############################################################################
 
-### Health Check - Volunteer Service
-GET {{volunteerUrl}}/health
+### Liveness - Volunteer Service
+GET {{volunteerUrl}}/health/live
+
+### Readiness (valida tabela DynamoDB) - Volunteer Service
+GET {{volunteerUrl}}/health/ready
 
 ### Cadastrar voluntario
 POST {{volunteerUrl}}/volunteers
