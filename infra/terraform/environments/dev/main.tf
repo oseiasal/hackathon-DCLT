@@ -49,6 +49,27 @@ module "elasticache" {
   node_type         = var.elasticache_node_type
 }
 
+module "eks" {
+  source = "../../modules/eks"
+
+  project_name           = var.project_name
+  environment            = var.environment
+  cluster_name           = var.eks_cluster_name
+  cluster_version        = var.eks_cluster_version
+  private_app_subnet_ids = module.network.private_app_subnet_ids
+  sg_rds_id              = module.network.sg_rds_id
+  sg_elasticache_id      = module.network.sg_elasticache_id
+  node_instance_types    = var.eks_node_instance_types
+  capacity_type          = var.eks_capacity_type
+  node_desired_size      = var.eks_node_desired_size
+  node_min_size          = var.eks_node_min_size
+  node_max_size          = var.eks_node_max_size
+  sqs_queue_arn          = module.sqs.queue_arn
+  dynamodb_table_arn     = module.dynamodb.table_arn
+  rds_secret_arn         = module.rds.master_user_secret_arn
+  admin_principal_arns   = var.eks_admin_principal_arns
+}
+
 module "finops" {
   source = "../../modules/finops"
 

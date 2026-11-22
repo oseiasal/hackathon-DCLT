@@ -14,6 +14,41 @@ variable "eks_cluster_name" {
   type = string
 }
 
+variable "eks_cluster_version" {
+  type    = string
+  default = "1.31"
+}
+
+variable "eks_node_instance_types" {
+  type    = list(string)
+  default = ["t3.medium"]
+}
+
+variable "eks_capacity_type" {
+  type    = string
+  default = "ON_DEMAND"
+}
+
+variable "eks_node_desired_size" {
+  type    = number
+  default = 2
+}
+
+variable "eks_node_min_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_node_max_size" {
+  type    = number
+  default = 4
+}
+
+variable "eks_admin_principal_arns" {
+  type    = list(string)
+  default = []
+}
+
 variable "vpc_cidr" {
   type    = string
   default = "10.0.0.0/16"

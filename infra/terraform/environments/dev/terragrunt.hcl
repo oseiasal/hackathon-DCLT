@@ -13,6 +13,12 @@ locals {
 
 inputs = {
   eks_cluster_name         = "solidarytech-dev-eks"
+  eks_cluster_version      = "1.31"
+  eks_node_instance_types  = ["t3.medium"]
+  eks_capacity_type        = "ON_DEMAND"
+  eks_node_desired_size    = 2
+  eks_node_min_size        = 1
+  eks_node_max_size        = 4
   vpc_cidr                 = "10.0.0.0/16"
   az_count                 = 2
   single_nat_gateway       = true

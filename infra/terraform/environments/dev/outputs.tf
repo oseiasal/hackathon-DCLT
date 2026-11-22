@@ -38,6 +38,26 @@ output "elasticache_endpoint" {
   value = module.elasticache.endpoint
 }
 
+output "eks_cluster_name" {
+  value = module.eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  value = module.eks.cluster_endpoint
+}
+
+output "irsa_donation_role_arn" {
+  value = module.eks.irsa_donation_role_arn
+}
+
+output "irsa_volunteer_role_arn" {
+  value = module.eks.irsa_volunteer_role_arn
+}
+
+output "irsa_secrets_role_arn" {
+  value = module.eks.irsa_secrets_role_arn
+}
+
 output "budget_name" {
   value = module.finops.budget_name
 }
