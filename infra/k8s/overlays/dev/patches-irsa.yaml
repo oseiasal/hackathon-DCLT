@@ -5,7 +5,7 @@ metadata:
   name: donation-service
   namespace: solidarytech
   annotations:
-    eks.amazonaws.com/role-arn: <IRSA_DONATION_ROLE_ARN>
+    eks.amazonaws.com/role-arn: arn:aws:iam::665303623973:role/solidarytech-dev-irsa-donation-service
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -13,7 +13,7 @@ metadata:
   name: volunteer-service
   namespace: solidarytech
   annotations:
-    eks.amazonaws.com/role-arn: <IRSA_VOLUNTEER_ROLE_ARN>
+    eks.amazonaws.com/role-arn: arn:aws:iam::665303623973:role/solidarytech-dev-irsa-volunteer-service
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -21,4 +21,4 @@ metadata:
   name: external-secrets
   namespace: solidarytech
   annotations:
-    eks.amazonaws.com/role-arn: <IRSA_SECRETS_ROLE_ARN>
+    eks.amazonaws.com/role-arn: arn:aws:iam::665303623973:role/solidarytech-dev-irsa-external-secrets
