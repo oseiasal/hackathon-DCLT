@@ -4,8 +4,9 @@ locals {
   owner        = "platform-engineering"
   cost_center  = "hackathon-fase5"
 
-  # Extrai o ambiente do caminho da pasta (ex: environments/dev -> "dev", shared/ecr -> "shared")
-  path_parts  = split("/", path_relative_to_include())
+  # Normaliza separador de caminho (Windows "\" -> "/") para funcionar igual local e no CI/CD Linux
+  rel_path    = replace(path_relative_to_include(), "\\", "/")
+  path_parts  = split("/", local.rel_path)
   environment = local.path_parts[0] == "environments" ? local.path_parts[1] : "shared"
 
   state_bucket = get_env("TF_STATE_BUCKET", "${local.project_name}-tfstate-${get_aws_account_id()}-${local.aws_region}")
@@ -16,7 +17,7 @@ remote_state {
   backend = "s3"
   config = {
     bucket       = local.state_bucket
-    key          = "${path_relative_to_include()}/terraform.tfstate"
+    key          = "${local.rel_path}/terraform.tfstate"
     region       = local.aws_region
     encrypt      = true
     use_lockfile = true
