@@ -2,6 +2,10 @@ include "root" {
   path = find_in_parent_folders("root.hcl")
 }
 
+terraform {
+  source = "../..//environments/dev"
+}
+
 locals {
   alert_email  = get_env("FINOPS_ALERT_EMAIL", "")
   alert_emails = local.alert_email != "" ? [local.alert_email] : []
