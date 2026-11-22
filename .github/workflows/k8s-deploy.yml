@@ -1,0 +1,36 @@
+name: ☸️ K8s — Kustomize Validate & Deploy (OIDC)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/k8s/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Executar apenas validação / dry-run no cluster'
+        required: false
+        type: boolean
+        default: true
+      run_smoke_tests:
+        description: 'Executar smoke tests após deploy'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  k8s-deploy:
+    uses: oseiasal/.github/.github/workflows/reusable-kustomize-deploy.yml@main
+    with:
+      k8s_overlay: 'infra/k8s/overlays/dev'
+      cluster_name: 'solidarytech-dev-eks'
+      aws_region: 'us-east-1'
+      namespace: 'solidarytech'
+      services: 'ngo-service donation-service volunteer-service'
+      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || true }}
+      run_smoke_tests: ${{ github.event_name == 'workflow_dispatch' && inputs.run_smoke_tests || false }}
+    secrets: inherit
