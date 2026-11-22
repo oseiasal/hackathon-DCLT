@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solidarytech-config
+  namespace: solidarytech
+data:
+  LOG_LEVEL: "INFO"
+  AWS_REGION: "us-east-1"
+  AWS_DYNAMODB_TABLE: "SolidaryTechVolunteers"
+  AWS_DYNAMODB_NGO_INDEX: "ngo_id-index"
+  AWS_SQS_URL: "https://sqs.us-east-1.amazonaws.com/000000000000/solidary-donations"

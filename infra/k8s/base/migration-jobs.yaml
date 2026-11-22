@@ -1,0 +1,99 @@
+# Processos Administrativos One-Off (12-Factor #12)
+# Executados automaticamente antes do sync no ArgoCD (PreSync) ou sob demanda com kubectl.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ngo-migrate
+  namespace: solidarytech
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: ngo-migrate
+          image: solidarytech/ngo-service:latest
+          command: ["python", "manage.py", "migrate"]
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: solidarytech-config
+                  key: LOG_LEVEL
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: solidarytech-db-credentials
+                  key: NGO_DATABASE_URL
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: donation-migrate
+  namespace: solidarytech
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      initContainers:
+        # Garante que o banco donation_db existe no RDS (RDS cria apenas ngo_db por padrão)
+        - name: ensure-donation-db
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 <<'EOSQL'
+              SELECT 'CREATE DATABASE donation_db'
+              WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'donation_db')\gexec
+              EOSQL
+          env:
+            - name: POSTGRES_ADMIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: solidarytech-db-credentials
+                  key: POSTGRES_ADMIN_URL
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        - name: donation-migrate
+          image: solidarytech/donation-service:latest
+          args: ["migrate"]
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: solidarytech-config
+                  key: LOG_LEVEL
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: solidarytech-db-credentials
+                  key: DONATION_DATABASE_URL
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
