@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -67,6 +68,18 @@ func setupLogger() *slog.Logger {
 	return slog.New(handler).With("service", serviceName)
 }
 
+func getEnvInt(key string, defaultVal int) int {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return defaultVal
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		return defaultVal
+	}
+	return v
+}
+
 func main() {
 	_ = godotenv.Load()
 
@@ -90,6 +103,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	maxOpenConns := getEnvInt("DB_MAX_OPEN_CONNS", 25)
+	maxIdleConns := getEnvInt("DB_MAX_IDLE_CONNS", 5)
+	connMaxLifetimeSec := getEnvInt("DB_CONN_MAX_LIFETIME_SEC", 300)
+	connMaxIdleTimeSec := getEnvInt("DB_CONN_MAX_IDLE_TIME_SEC", 60)
+
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetMaxIdleConns(maxIdleConns)
+	db.SetConnMaxLifetime(time.Duration(connMaxLifetimeSec) * time.Second)
+	db.SetConnMaxIdleTime(time.Duration(connMaxIdleTimeSec) * time.Second)
+
 	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	err = db.PingContext(pingCtx)
 	pingCancel()
@@ -98,7 +121,12 @@ func main() {
 		_ = db.Close()
 		os.Exit(1)
 	}
-	logger.Info("Conectado ao PostgreSQL")
+	logger.Info("Conectado ao PostgreSQL",
+		"max_open_conns", maxOpenConns,
+		"max_idle_conns", maxIdleConns,
+		"conn_max_lifetime_sec", connMaxLifetimeSec,
+		"conn_max_idle_time_sec", connMaxIdleTimeSec,
+	)
 
 	if len(os.Args) > 1 {
 		cmdCtx, cmdCancel := context.WithTimeout(context.Background(), 30*time.Second)

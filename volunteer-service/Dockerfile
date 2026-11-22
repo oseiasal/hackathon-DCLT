@@ -15,9 +15,11 @@ COPY --chown=1000:1000 app.py .
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8083
+    PORT=8083 \
+    GUNICORN_WORKERS=1 \
+    GUNICORN_THREADS=4
 
 USER 1000:1000
 EXPOSE 8083
 
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --graceful-timeout 30 --timeout 30 --error-logfile - app:app"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --graceful-timeout 30 --timeout 30 --error-logfile - app:app"]

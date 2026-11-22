@@ -7,7 +7,7 @@ import sys
 import time
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from psycopg2.pool import SimpleConnectionPool
+from psycopg2.pool import ThreadedConnectionPool
 from flask import Flask, g, request, jsonify
 from dotenv import load_dotenv
 
@@ -56,9 +56,12 @@ if not DATABASE_URL:
     log.critical("DATABASE_URL não definida.")
     sys.exit(1)
 
+DB_POOL_MIN = max(1, int(os.getenv("DB_POOL_MIN", "1")))
+DB_POOL_MAX = max(DB_POOL_MIN, int(os.getenv("DB_POOL_MAX", "10")))
+
 try:
-    pool = SimpleConnectionPool(1, 10, dsn=DATABASE_URL, connect_timeout=5)
-    log.info("Pool de conexões com o PostgreSQL inicializado.")
+    pool = ThreadedConnectionPool(DB_POOL_MIN, DB_POOL_MAX, dsn=DATABASE_URL, connect_timeout=5)
+    log.info(f"Pool thread-safe PostgreSQL inicializado (min={DB_POOL_MIN}, max={DB_POOL_MAX}).")
 except Exception as e:
     log.critical("Erro ao conectar ao PostgreSQL.", extra={"error": str(e)})
     sys.exit(1)

@@ -16,9 +16,11 @@ COPY --chown=1000:1000 db/migrations ./db/migrations
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8081
+    PORT=8081 \
+    GUNICORN_WORKERS=1 \
+    GUNICORN_THREADS=4
 
 USER 1000:1000
 EXPOSE 8081
 
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --graceful-timeout 30 --timeout 30 --error-logfile - app:app"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --graceful-timeout 30 --timeout 30 --error-logfile - app:app"]
