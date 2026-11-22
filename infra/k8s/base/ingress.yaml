@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solidarytech-ingress
+  namespace: solidarytech
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /ngos
+            pathType: Prefix
+            backend:
+              service:
+                name: ngo-service
+                port:
+                  number: 8081
+          - path: /donations
+            pathType: Prefix
+            backend:
+              service:
+                name: donation-service
+                port:
+                  number: 8082
+          - path: /volunteers
+            pathType: Prefix
+            backend:
+              service:
+                name: volunteer-service
+                port:
+                  number: 8083

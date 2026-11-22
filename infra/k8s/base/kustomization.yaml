@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: solidarytech
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: solidarytech
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - serviceaccounts.yaml
+  - configmap.yaml
+  - ngo-service.yaml
+  - donation-service.yaml
+  - volunteer-service.yaml
+  - migration-jobs.yaml
+  - ingress.yaml

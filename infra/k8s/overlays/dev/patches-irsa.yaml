@@ -1,0 +1,24 @@
+# Anotações IRSA — preencha com os outputs do Terragrunt em infra/terraform/environments/dev
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: donation-service
+  namespace: solidarytech
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::665303623973:role/solidarytech-dev-irsa-donation-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: volunteer-service
+  namespace: solidarytech
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::665303623973:role/solidarytech-dev-irsa-volunteer-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-secrets
+  namespace: solidarytech
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::665303623973:role/solidarytech-dev-irsa-external-secrets
