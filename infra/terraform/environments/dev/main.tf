@@ -49,6 +49,18 @@ module "elasticache" {
   node_type         = var.elasticache_node_type
 }
 
+module "ssm" {
+  source = "../../modules/ssm"
+
+  project_name         = var.project_name
+  environment          = var.environment
+  rds_address          = module.rds.address
+  sqs_queue_url        = module.sqs.queue_url
+  elasticache_endpoint = module.elasticache.endpoint
+  dynamodb_table       = module.dynamodb.table_name
+  dynamodb_ngo_index   = var.dynamodb_ngo_index_name
+}
+
 module "eks" {
   source = "../../modules/eks"
 

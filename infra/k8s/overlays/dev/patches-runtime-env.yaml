@@ -1,0 +1,42 @@
+# Direciona URLs e endpoints de runtime para o Secret sincronizado do AWS SSM Parameter Store
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: donation-service
+  namespace: solidarytech
+spec:
+  template:
+    spec:
+      containers:
+        - name: donation-service
+          env:
+            - name: AWS_SQS_URL
+              valueFrom:
+                configMapKeyRef: null
+                secretKeyRef:
+                  name: solidarytech-runtime-config
+                  key: AWS_SQS_URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: volunteer-service
+  namespace: solidarytech
+spec:
+  template:
+    spec:
+      containers:
+        - name: volunteer-service
+          env:
+            - name: AWS_DYNAMODB_TABLE
+              valueFrom:
+                configMapKeyRef: null
+                secretKeyRef:
+                  name: solidarytech-runtime-config
+                  key: AWS_DYNAMODB_TABLE
+            - name: AWS_DYNAMODB_NGO_INDEX
+              valueFrom:
+                configMapKeyRef: null
+                secretKeyRef:
+                  name: solidarytech-runtime-config
+                  key: AWS_DYNAMODB_NGO_INDEX

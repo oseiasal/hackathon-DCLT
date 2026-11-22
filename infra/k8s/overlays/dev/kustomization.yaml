@@ -19,4 +19,4 @@ images:
 
 patches:
   - path: patches-irsa.yaml
-  - path: patches-configmap.yaml
+  - path: patches-runtime-env.yaml

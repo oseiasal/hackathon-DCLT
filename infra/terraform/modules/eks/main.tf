@@ -1,3 +1,6 @@
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
 }
@@ -263,15 +266,26 @@ resource "aws_iam_role" "irsa_secrets" {
 }
 
 resource "aws_iam_role_policy" "irsa_secrets_read" {
-  name = "secretsmanager-read"
+  name = "secretsmanager-and-ssm-read"
   role = aws_iam_role.irsa_secrets.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
-      Resource = var.rds_secret_arn
-    }]
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
+        Resource = var.rds_secret_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project_name}/${var.environment}/*"
+      }
+    ]
   })
 }

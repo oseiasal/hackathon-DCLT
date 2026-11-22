@@ -58,6 +58,10 @@ output "irsa_secrets_role_arn" {
   value = module.eks.irsa_secrets_role_arn
 }
 
+output "ssm_parameter_names" {
+  value = module.ssm.parameter_names
+}
+
 output "budget_name" {
   value = module.finops.budget_name
 }

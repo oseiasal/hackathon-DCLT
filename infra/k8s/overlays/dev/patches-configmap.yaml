@@ -1,8 +1,0 @@
-# Preencha <SQS_QUEUE_URL> com o output `sqs_queue_url` do Terragrunt
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: solidarytech-config
-  namespace: solidarytech
-data:
-  AWS_SQS_URL: "https://sqs.us-east-1.amazonaws.com/665303623973/solidary-donations"
