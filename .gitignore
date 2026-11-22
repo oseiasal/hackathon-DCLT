@@ -24,8 +24,12 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Terraform (futuro)
+# Terraform & Terragrunt
 .terraform/
+.terragrunt-cache/
 *.tfstate
 *.tfstate.*
 *.tfvars
+infra/terraform/**/provider.tf
+infra/terraform/**/backend.tf
+infra/terraform/**/versions.tf
