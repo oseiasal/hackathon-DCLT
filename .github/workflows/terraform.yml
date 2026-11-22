@@ -1,0 +1,50 @@
+name: 🏗️ IaC — Terraform & Terragrunt (OIDC)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: 'Stack Terragrunt alvo'
+        required: true
+        type: choice
+        default: 'infra/terraform/environments/dev'
+        options:
+          - infra/terraform/environments/dev
+          - infra/terraform/shared/ecr
+      action:
+        description: 'Ação do Terragrunt'
+        required: true
+        type: choice
+        default: 'plan'
+        options:
+          - plan
+          - validate
+          - apply
+          - destroy
+      auto_approve:
+        description: 'Auto-aprovar apply/destroy'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  terragrunt:
+    uses: oseiasal/.github/.github/workflows/reusable-terragrunt.yml@main
+    with:
+      working_directory: ${{ github.event_name == 'workflow_dispatch' && inputs.stack || 'infra/terraform/environments/dev' }}
+      terragrunt_action: ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'plan' }}
+      aws_region: 'us-east-1'
+      terraform_version: '1.13.3'
+      terragrunt_version: '1.1.1'
+      auto_approve: ${{ github.event_name == 'workflow_dispatch' && inputs.auto_approve || false }}
+      run_security_scan: true
+    secrets: inherit

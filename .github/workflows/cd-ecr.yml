@@ -1,0 +1,111 @@
+name: 🐳 CD — Build, Trivy Scan & ECR Push (OIDC)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ngo-service/**'
+      - 'donation-service/**'
+      - 'volunteer-service/**'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Serviço para build e push no Amazon ECR'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - all
+          - ngo-service
+          - donation-service
+          - volunteer-service
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  changes:
+    name: Detect Services to Publish
+    runs-on: ubuntu-latest
+    outputs:
+      ngo: ${{ steps.resolve.outputs.ngo }}
+      donation: ${{ steps.resolve.outputs.donation }}
+      volunteer: ${{ steps.resolve.outputs.volunteer }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'push'
+        with:
+          filters: |
+            ngo:
+              - 'ngo-service/**'
+            donation:
+              - 'donation-service/**'
+            volunteer:
+              - 'volunteer-service/**'
+      - name: Resolve Targets
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SVC="${{ inputs.service }}"
+            echo "ngo=$([ "$SVC" = "all" ] || [ "$SVC" = "ngo-service" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+            echo "donation=$([ "$SVC" = "all" ] || [ "$SVC" = "donation-service" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+            echo "volunteer=$([ "$SVC" = "all" ] || [ "$SVC" = "volunteer-service" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          else
+            echo "ngo=${{ steps.filter.outputs.ngo }}" >> "$GITHUB_OUTPUT"
+            echo "donation=${{ steps.filter.outputs.donation }}" >> "$GITHUB_OUTPUT"
+            echo "volunteer=${{ steps.filter.outputs.volunteer }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  push-ngo:
+    name: 🐳 ECR Push — ngo-service
+    needs: changes
+    if: needs.changes.outputs.ngo == 'true'
+    uses: oseiasal/.github/.github/workflows/reusable-docker-push.yml@main
+    with:
+      image-name: 'solidarytech/ngo-service'
+      dockerfile-path: 'ngo-service/Dockerfile'
+      build-context: './ngo-service'
+      aws-region: 'us-east-1'
+      push-image: true
+      tag-latest: false
+      scan-image: true
+      trivy-severity: 'CRITICAL'
+      fail-on-critical: true
+    secrets: inherit
+
+  push-donation:
+    name: 🐳 ECR Push — donation-service
+    needs: changes
+    if: needs.changes.outputs.donation == 'true'
+    uses: oseiasal/.github/.github/workflows/reusable-docker-push.yml@main
+    with:
+      image-name: 'solidarytech/donation-service'
+      dockerfile-path: 'donation-service/Dockerfile'
+      build-context: './donation-service'
+      aws-region: 'us-east-1'
+      push-image: true
+      tag-latest: false
+      scan-image: true
+      trivy-severity: 'CRITICAL'
+      fail-on-critical: true
+    secrets: inherit
+
+  push-volunteer:
+    name: 🐳 ECR Push — volunteer-service
+    needs: changes
+    if: needs.changes.outputs.volunteer == 'true'
+    uses: oseiasal/.github/.github/workflows/reusable-docker-push.yml@main
+    with:
+      image-name: 'solidarytech/volunteer-service'
+      dockerfile-path: 'volunteer-service/Dockerfile'
+      build-context: './volunteer-service'
+      aws-region: 'us-east-1'
+      push-image: true
+      tag-latest: false
+      scan-image: true
+      trivy-severity: 'CRITICAL'
+      fail-on-critical: true
+    secrets: inherit
