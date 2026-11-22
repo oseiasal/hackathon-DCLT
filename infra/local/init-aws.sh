@@ -4,6 +4,7 @@ set -e
 PORT="${AWS_EMULATOR_PORT:-9297}"
 REGION="${AWS_REGION:-us-east-1}"
 TABLE_NAME="${AWS_DYNAMODB_TABLE:-SolidaryTechVolunteers}"
+NGO_INDEX_NAME="${AWS_DYNAMODB_NGO_INDEX:-ngo_id-index}"
 QUEUE_NAME="${AWS_SQS_QUEUE_NAME:-solidary-donations}"
 
 export AWS_ENDPOINT_URL="https://127.0.0.1:${PORT}"
@@ -37,11 +38,14 @@ if aws dynamodb describe-table --table-name "${TABLE_NAME}" --region "${REGION}"
 else
   aws dynamodb create-table \
     --table-name "${TABLE_NAME}" \
-    --attribute-definitions AttributeName=volunteer_id,AttributeType=S \
+    --attribute-definitions \
+      AttributeName=volunteer_id,AttributeType=S \
+      AttributeName=ngo_id,AttributeType=N \
     --key-schema AttributeName=volunteer_id,KeyType=HASH \
+    --global-secondary-indexes "[{\"IndexName\":\"${NGO_INDEX_NAME}\",\"KeySchema\":[{\"AttributeName\":\"ngo_id\",\"KeyType\":\"HASH\"}],\"Projection\":{\"ProjectionType\":\"ALL\"}}]" \
     --billing-mode PAY_PER_REQUEST \
     --region "${REGION}" >/dev/null
-  echo "Tabela DynamoDB ${TABLE_NAME} criada com sucesso."
+  echo "Tabela DynamoDB ${TABLE_NAME} criada com sucesso (com GSI ${NGO_INDEX_NAME})."
 fi
 
 echo "Provisionamento local no AWS Emulator concluído."

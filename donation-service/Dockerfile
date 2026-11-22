@@ -1,10 +1,12 @@
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
-COPY go.mod ./
-COPY main.go ./
-RUN go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/donation-service .
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+COPY *.go ./
+COPY db/migrations ./db/migrations
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=readonly -ldflags="-s -w" -o /app/donation-service .
 
 FROM alpine:3.20
 

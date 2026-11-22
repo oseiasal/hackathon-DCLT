@@ -1,8 +1,8 @@
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY requirements.lock .
+RUN pip install --no-cache-dir --no-deps --prefix=/install -r requirements.lock
 
 FROM python:3.11-slim
 
@@ -11,13 +11,16 @@ RUN groupadd --gid 1000 appuser && \
 
 WORKDIR /app
 COPY --from=builder /install /usr/local
-COPY --chown=1000:1000 app.py .
+COPY --chown=1000:1000 app.py manage.py ./
+COPY --chown=1000:1000 db/migrations ./db/migrations
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8081
+    PORT=8081 \
+    GUNICORN_WORKERS=1 \
+    GUNICORN_THREADS=4
 
 USER 1000:1000
 EXPOSE 8081
 
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} app:app"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --graceful-timeout 30 --timeout 30 --error-logfile - app:app"]
