@@ -6,6 +6,7 @@ import sys
 import time
 import uuid
 import boto3
+from boto3.dynamodb.conditions import Key
 from botocore.config import Config
 from flask import Flask, g, request, jsonify
 from dotenv import load_dotenv
@@ -52,6 +53,7 @@ app = Flask(__name__)
 
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 DYNAMODB_TABLE = os.getenv("AWS_DYNAMODB_TABLE")
+DYNAMODB_NGO_INDEX = os.getenv("AWS_DYNAMODB_NGO_INDEX", "ngo_id-index")
 
 if not DYNAMODB_TABLE:
     log.critical("AWS_DYNAMODB_TABLE não definida.")
@@ -129,12 +131,19 @@ def register_volunteer():
 @app.route('/volunteers/<int:ngo_id>', methods=['GET'])
 def get_volunteers_by_ngo(ngo_id):
     try:
-        # Nota para avaliação dos alunos: Operação Scan simplificada para fins de desenvolvimento.
-        # Em cenários complexos de produção, índices globais secundários (GSI) seriam exigidos.
-        response = table.scan(
-            FilterExpression=boto3.dynamodb.conditions.Attr('ngo_id').eq(ngo_id)
+        response = table.query(
+            IndexName=DYNAMODB_NGO_INDEX,
+            KeyConditionExpression=Key('ngo_id').eq(ngo_id),
         )
-        return jsonify(response.get('Items', [])), 200
+        items = response.get('Items', [])
+        while 'LastEvaluatedKey' in response:
+            response = table.query(
+                IndexName=DYNAMODB_NGO_INDEX,
+                KeyConditionExpression=Key('ngo_id').eq(ngo_id),
+                ExclusiveStartKey=response['LastEvaluatedKey'],
+            )
+            items.extend(response.get('Items', []))
+        return jsonify(items), 200
     except Exception as e:
         log.error("Erro ao buscar dados no DynamoDB.", extra={"error": str(e)})
         return jsonify({"error": "Erro interno"}), 500
