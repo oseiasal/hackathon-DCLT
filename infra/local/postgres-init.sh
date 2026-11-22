@@ -11,10 +11,4 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "postgres" <<-EOSQL
     WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'donation_db')\gexec
 EOSQL
 
-echo "Aplicando schema inicial em ngo_db..."
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "ngo_db" -f /sql/ngo-init.sql
-
-echo "Aplicando schema inicial em donation_db..."
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "donation_db" -f /sql/donation-init.sql
-
-echo "Bancos inicializados com sucesso."
+echo "Bancos ngo_db e donation_db prontos (schemas gerenciados via processos one-off de migration)."

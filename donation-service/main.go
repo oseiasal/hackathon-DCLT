@@ -100,6 +100,30 @@ func main() {
 	}
 	logger.Info("Conectado ao PostgreSQL")
 
+	if len(os.Args) > 1 {
+		cmdCtx, cmdCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cmdCancel()
+		defer db.Close()
+
+		switch os.Args[1] {
+		case "migrate":
+			if err := runMigrations(cmdCtx, db, logger); err != nil {
+				logger.Error("Falha ao executar migrations", "error", err)
+				os.Exit(1)
+			}
+			return
+		case "migrate-status":
+			if err := printMigrationStatus(cmdCtx, db, logger); err != nil {
+				logger.Error("Falha ao consultar status das migrations", "error", err)
+				os.Exit(1)
+			}
+			return
+		default:
+			logger.Error("Subcomando inválido; use: migrate | migrate-status", "arg", os.Args[1])
+			os.Exit(2)
+		}
+	}
+
 	var sqsSvc *sqs.SQS
 	queueURL := os.Getenv("AWS_SQS_URL")
 	region := os.Getenv("AWS_REGION")

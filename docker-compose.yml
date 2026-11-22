@@ -13,8 +13,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/local/postgres-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
-      - ./ngo-service/db/init.sql:/sql/ngo-init.sql:ro
-      - ./donation-service/db/init.sql:/sql/donation-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-solidary} -d postgres"]
       interval: 5s
@@ -74,14 +72,34 @@ services:
     entrypoint: ["/bin/sh", "/init-aws.sh"]
     restart: "no"
 
+  # Processos administrativos one-off (12-Factor #12):
+  # Usam a mesma imagem e mesmas variáveis de ambiente dos serviços.
+  ngo-migrate:
+    build:
+      context: ./ngo-service
+      dockerfile: Dockerfile
+    image: solidarytech-ngo-service:latest
+    container_name: solidarytech-ngo-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: "postgres://${POSTGRES_USER:-solidary}:${POSTGRES_PASSWORD:-solidary_pass}@postgres:5432/ngo_db"
+    command: ["python", "manage.py", "migrate"]
+    restart: "no"
+    networks:
+      - solidarytech
+
   ngo-service:
     build:
       context: ./ngo-service
       dockerfile: Dockerfile
+    image: solidarytech-ngo-service:latest
     container_name: solidarytech-ngo-service
     depends_on:
-      postgres:
-        condition: service_healthy
+      ngo-migrate:
+        condition: service_completed_successfully
     ports:
       - "${NGO_SERVICE_PORT:-8081}:8081"
     environment:
@@ -92,15 +110,33 @@ services:
     networks:
       - solidarytech
 
+  donation-migrate:
+    build:
+      context: ./donation-service
+      dockerfile: Dockerfile
+    image: solidarytech-donation-service:latest
+    container_name: solidarytech-donation-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: "postgres://${POSTGRES_USER:-solidary}:${POSTGRES_PASSWORD:-solidary_pass}@postgres:5432/donation_db"
+    command: ["migrate"]
+    restart: "no"
+    networks:
+      - solidarytech
+
   donation-service:
     build:
       context: ./donation-service
       dockerfile: Dockerfile
+    image: solidarytech-donation-service:latest
     container_name: solidarytech-donation-service
     network_mode: "service:aws-emulator"
     depends_on:
-      postgres:
-        condition: service_healthy
+      donation-migrate:
+        condition: service_completed_successfully
       aws-emulator-init:
         condition: service_completed_successfully
     environment:

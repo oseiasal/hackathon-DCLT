@@ -4,7 +4,8 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
-COPY main.go ./
+COPY *.go ./
+COPY db/migrations ./db/migrations
 RUN CGO_ENABLED=0 GOOS=linux go build -mod=readonly -ldflags="-s -w" -o /app/donation-service .
 
 FROM alpine:3.20

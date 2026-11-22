@@ -1,5 +1,4 @@
 .env
-db/
 *.exe
 *.out
 donation-service

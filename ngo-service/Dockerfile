@@ -11,7 +11,8 @@ RUN groupadd --gid 1000 appuser && \
 
 WORKDIR /app
 COPY --from=builder /install /usr/local
-COPY --chown=1000:1000 app.py .
+COPY --chown=1000:1000 app.py manage.py ./
+COPY --chown=1000:1000 db/migrations ./db/migrations
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
