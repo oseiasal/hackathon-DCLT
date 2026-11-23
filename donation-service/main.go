@@ -131,7 +131,7 @@ func main() {
 	if len(os.Args) > 1 {
 		cmdCtx, cmdCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cmdCancel()
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		switch os.Args[1] {
 		case "migrate":
@@ -244,7 +244,7 @@ func (a *App) loggingMiddleware(next http.Handler) http.Handler {
 func (a *App) HealthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok","service":"donation-service"}`))
+	_, _ = w.Write([]byte(`{"status":"ok","service":"donation-service"}`))
 }
 
 func (a *App) ReadyHandler(w http.ResponseWriter, r *http.Request) {
@@ -256,12 +256,12 @@ func (a *App) ReadyHandler(w http.ResponseWriter, r *http.Request) {
 	if err := a.DB.PingContext(ctx); err != nil {
 		a.Logger.Warn("Readiness check falhou", "dependency", "postgres", "error", err)
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(`{"status":"not_ready","service":"donation-service","checks":{"postgres":"error"}}`))
+		_, _ = w.Write([]byte(`{"status":"not_ready","service":"donation-service","checks":{"postgres":"error"}}`))
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ready","service":"donation-service","checks":{"postgres":"ok"}}`))
+	_, _ = w.Write([]byte(`{"status":"ready","service":"donation-service","checks":{"postgres":"ok"}}`))
 }
 
 func (a *App) DonationHandler(w http.ResponseWriter, r *http.Request) {
@@ -293,7 +293,9 @@ func (a *App) DonationHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(d)
+		if err := json.NewEncoder(w).Encode(d); err != nil {
+			a.Logger.Error("Erro ao serializar resposta da doação", "error", err)
+		}
 		return
 	}
 
@@ -304,16 +306,27 @@ func (a *App) DonationHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"Erro interno"}`, http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		donations := []Donation{}
 		for rows.Next() {
 			var d Donation
-			rows.Scan(&d.ID, &d.NgoID, &d.Amount, &d.DonorName, &d.Status, &d.CreatedAt)
+			if err := rows.Scan(&d.ID, &d.NgoID, &d.Amount, &d.DonorName, &d.Status, &d.CreatedAt); err != nil {
+				a.Logger.Error("Erro ao ler registro de doação", "error", err)
+				http.Error(w, `{"error":"Erro interno"}`, http.StatusInternalServerError)
+				return
+			}
 			donations = append(donations, d)
 		}
+		if err := rows.Err(); err != nil {
+			a.Logger.Error("Erro durante iteração das doações", "error", err)
+			http.Error(w, `{"error":"Erro interno"}`, http.StatusInternalServerError)
+			return
+		}
 
-		json.NewEncoder(w).Encode(donations)
+		if err := json.NewEncoder(w).Encode(donations); err != nil {
+			a.Logger.Error("Erro ao serializar lista de doações", "error", err)
+		}
 		return
 	}
 
