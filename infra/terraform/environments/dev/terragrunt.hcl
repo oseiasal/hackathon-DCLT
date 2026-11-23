@@ -19,6 +19,7 @@ inputs = {
   eks_node_desired_size    = 2
   eks_node_min_size        = 1
   eks_node_max_size        = 4
+  eks_admin_principal_arns = ["arn:aws:iam::665303623973:role/solidarytech-github-actions-role"]
   vpc_cidr                 = "10.0.0.0/16"
   az_count                 = 2
   single_nat_gateway       = true
