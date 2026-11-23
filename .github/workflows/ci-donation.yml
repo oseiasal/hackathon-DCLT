@@ -19,7 +19,7 @@ jobs:
     name: Quality & Unit Tests
     uses: oseiasal/.github/.github/workflows/reusable-go-quality.yml@main
     with:
-      go-version: '1.21'
+      go-version: '1.25'
       working-directory: 'donation-service'
 
   security:
@@ -27,7 +27,7 @@ jobs:
     uses: oseiasal/.github/.github/workflows/reusable-security.yml@main
     with:
       language: 'go'
-      go-version: '1.21'
+      go-version: '1.25'
       working-directory: 'donation-service'
       enable-iac-scan: false
       trivy-severity: 'CRITICAL'
