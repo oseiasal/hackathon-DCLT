@@ -1,0 +1,34 @@
+name: 🐍 CI — Volunteer Service
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'volunteer-service/**'
+  push:
+    branches: [main, 'feat/**']
+    paths:
+      - 'volunteer-service/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality & Unit Tests
+    uses: oseiasal/.github/.github/workflows/reusable-python-quality.yml@main
+    with:
+      python-version: '3.11'
+      working-directory: 'volunteer-service'
+
+  security:
+    name: SAST (Bandit) & SCA (Trivy)
+    uses: oseiasal/.github/.github/workflows/reusable-security.yml@main
+    with:
+      language: 'python'
+      python-version: '3.11'
+      working-directory: 'volunteer-service'
+      enable-iac-scan: false
+      trivy-severity: 'CRITICAL'
+      fail-on-critical: true

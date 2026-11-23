@@ -1,0 +1,26 @@
+name: 🛡️ CI — Infra Security (Terraform & K8s)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/**'
+  push:
+    branches: [main, 'feat/**']
+    paths:
+      - 'infra/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  iac-security:
+    name: Trivy IaC & FS Scan
+    uses: oseiasal/.github/.github/workflows/reusable-security.yml@main
+    with:
+      language: 'iac'
+      working-directory: 'infra'
+      enable-iac-scan: true
+      trivy-severity: 'CRITICAL'
+      fail-on-critical: true
