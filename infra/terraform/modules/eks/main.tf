@@ -31,10 +31,13 @@ resource "aws_eks_cluster" "this" {
   version  = var.cluster_version
   role_arn = aws_iam_role.cluster.arn
 
+  # trivy:ignore:AVD-AWS-0040 -- Endpoint publico habilitado em dev para acesso do kubectl local e GitHub Actions hosted runners (desabilitar em prod via var.endpoint_public_access = false).
+  # trivy:ignore:AVD-AWS-0041 -- GitHub Actions ubuntu-latest utiliza IPs dinamicos; restringir via var.public_access_cidrs em prod com VPN/self-hosted runner.
   vpc_config {
     subnet_ids              = var.private_app_subnet_ids
     endpoint_private_access = true
-    endpoint_public_access  = true
+    endpoint_public_access  = var.endpoint_public_access
+    public_access_cidrs     = var.public_access_cidrs
   }
 
   access_config {

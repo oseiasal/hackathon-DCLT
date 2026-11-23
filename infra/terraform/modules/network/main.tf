@@ -157,10 +157,19 @@ resource "aws_security_group" "eks_nodes" {
   vpc_id      = aws_vpc.this.id
 
   egress {
-    description = "Permite trafego de saida dos nodes (NAT / endpoints AWS)"
+    description = "Trafego interno dentro da VPC (RDS, ElastiCache, DNS, controle EKS)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  # trivy:ignore:AVD-AWS-0104 -- Worker nodes em subnets privadas precisam de saida HTTPS (443) via NAT Gateway para ECR e APIs AWS (SQS, DynamoDB, SSM, Secrets Manager).
+  egress {
+    description = "Saida HTTPS (443) via NAT Gateway para ECR e APIs AWS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 

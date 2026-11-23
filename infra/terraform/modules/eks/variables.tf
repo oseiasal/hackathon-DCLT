@@ -90,3 +90,15 @@ variable "admin_principal_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "endpoint_public_access" {
+  description = "Habilita endpoint público da API EKS (true em dev para kubectl/GitHub Actions; false em prod)"
+  type        = bool
+  default     = true
+}
+
+variable "public_access_cidrs" {
+  description = "CIDRs autorizados no endpoint público do EKS (restringir ao CIDR da VPN em prod)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
